@@ -31,9 +31,13 @@ project "CLoud"
     includedirs {
 		"%{prj.name}/src",
 		"%{IncludeDir.glfw}",
-		"%{IncludeDir.glfw_deps}",
 		"%{IncludeDir.glad}"
 	}
+
+    links {
+        "glfw",
+        "glad"
+    }
 
 group "depend"
     project "glfw"
@@ -144,4 +148,41 @@ group "depend"
             runtime "Release"
             optimize "speed"
 
+    project "glad"
+        location "CLoud/depend/glad"
+        kind "StaticLib"
+        language "C"
+        staticruntime "off"
+        warnings "off"
+    
+        targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
+        objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
+    
+        files {
+            "%{prj.location}/include/glad/gl.h",
+            "%{prj.location}/include/KHR/khrplatform.h",
+            "%{prj.location}/src/gl.c"
+        }
+    
+        includedirs {
+            "%{prj.location}/include"
+        }
+    
+        filter "system:windows"
+            systemversion "latest"
+    
+        filter "configurations:Debug"
+            runtime "Debug"
+            symbols "on"
+    
+        filter { "system:windows", "configurations:Debug-AS" }	
+            runtime "Debug"
+            symbols "on"
+            sanitize { "Address" }
+            flags { "NoRuntimeChecks", "NoIncrementalLink" }
+    
+        filter "configurations:Release"
+            runtime "Release"
+            optimize "speed"
+            
 group ""

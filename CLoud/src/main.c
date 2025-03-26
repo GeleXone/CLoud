@@ -1,361 +1,172 @@
-﻿/*
- * 3-D gear wheels.  This program is in the public domain.
- *
- * Command line options:
- *    -info      print GL implementation information
- *    -exit      automatically exit after 30 seconds
- *
- *
- * Brian Paul
- *
- *
- * Marcus Geelnard:
- *   - Conversion to GLFW
- *   - Time based rendering (frame rate independent)
- *   - Slightly modified camera that should work better for stereo viewing
- *
- *
- * Camilla Löwy:
- *   - Removed FPS counter (this is not a benchmark)
- *   - Added a few comments
- *   - Enabled vsync
- */
-
-#if defined(_MSC_VER)
- // Make MS math.h define M_PI
-#define _USE_MATH_DEFINES
-#endif
-
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+//========================================================================
+// OpenGL triangle example
+// Copyright (c) Camilla Löwy <elmindreda@glfw.org>
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would
+//    be appreciated but is not required.
+//
+// 2. Altered source versions must be plainly marked as such, and must not
+//    be misrepresented as being the original software.
+//
+// 3. This notice may not be removed or altered from any source
+//    distribution.
+//
+//========================================================================
+//! [code]
 
 #define GLAD_GL_IMPLEMENTATION
 #include <glad/gl.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-/**
+#include "linmath.h"
 
-  Draw a gear wheel.  You'll probably want to call this function when
-  building a display list since we do a lot of trig here.
+#include <stdlib.h>
+#include <stddef.h>
+#include <stdio.h>
 
-  Input:  inner_radius - radius of hole at center
-          outer_radius - radius at center of teeth
-          width - width of gear teeth - number of teeth
-          tooth_depth - depth of tooth
-
- **/
-
-static void
-gear(GLfloat inner_radius, GLfloat outer_radius, GLfloat width,
-    GLint teeth, GLfloat tooth_depth)
+typedef struct Vertex
 {
-    GLint i;
-    GLfloat r0, r1, r2;
-    GLfloat angle, da;
-    GLfloat u, v, len;
+    vec2 pos;
+    vec3 col;
+} Vertex;
 
-    r0 = inner_radius;
-    r1 = outer_radius - tooth_depth / 2.f;
-    r2 = outer_radius + tooth_depth / 2.f;
+static const Vertex vertices[3] =
+{
+    { { -0.6f, -0.4f }, { 1.f, 0.f, 0.f } },
+    { {  0.6f, -0.4f }, { 0.f, 1.f, 0.f } },
+    { {   0.f,  0.6f }, { 0.f, 0.f, 1.f } }
+};
 
-    da = 2.f * (float)M_PI / teeth / 4.f;
+static const char* vertex_shader_text =
+"#version 330\n"
+"uniform mat4 MVP;\n"
+"in vec3 vCol;\n"
+"in vec2 vPos;\n"
+"out vec3 color;\n"
+"void main()\n"
+"{\n"
+"    gl_Position = MVP * vec4(vPos, 0.0, 1.0);\n"
+"    color = vCol;\n"
+"}\n";
 
-    glShadeModel(GL_FLAT);
+static const char* fragment_shader_text =
+"#version 330\n"
+"in vec3 color;\n"
+"out vec4 fragment;\n"
+"void main()\n"
+"{\n"
+"    fragment = vec4(color, 1.0);\n"
+"}\n";
 
-    glNormal3f(0.f, 0.f, 1.f);
-
-    /* draw front face */
-    glBegin(GL_QUAD_STRIP);
-    for (i = 0; i <= teeth; i++) {
-        angle = i * 2.f * (float)M_PI / teeth;
-        glVertex3f(r0 * (float)cos(angle), r0 * (float)sin(angle), width * 0.5f);
-        glVertex3f(r1 * (float)cos(angle), r1 * (float)sin(angle), width * 0.5f);
-        if (i < teeth) {
-            glVertex3f(r0 * (float)cos(angle), r0 * (float)sin(angle), width * 0.5f);
-            glVertex3f(r1 * (float)cos(angle + 3 * da), r1 * (float)sin(angle + 3 * da), width * 0.5f);
-        }
-    }
-    glEnd();
-
-    /* draw front sides of teeth */
-    glBegin(GL_QUADS);
-    da = 2.f * (float)M_PI / teeth / 4.f;
-    for (i = 0; i < teeth; i++) {
-        angle = i * 2.f * (float)M_PI / teeth;
-
-        glVertex3f(r1 * (float)cos(angle), r1 * (float)sin(angle), width * 0.5f);
-        glVertex3f(r2 * (float)cos(angle + da), r2 * (float)sin(angle + da), width * 0.5f);
-        glVertex3f(r2 * (float)cos(angle + 2 * da), r2 * (float)sin(angle + 2 * da), width * 0.5f);
-        glVertex3f(r1 * (float)cos(angle + 3 * da), r1 * (float)sin(angle + 3 * da), width * 0.5f);
-    }
-    glEnd();
-
-    glNormal3f(0.0, 0.0, -1.0);
-
-    /* draw back face */
-    glBegin(GL_QUAD_STRIP);
-    for (i = 0; i <= teeth; i++) {
-        angle = i * 2.f * (float)M_PI / teeth;
-        glVertex3f(r1 * (float)cos(angle), r1 * (float)sin(angle), -width * 0.5f);
-        glVertex3f(r0 * (float)cos(angle), r0 * (float)sin(angle), -width * 0.5f);
-        if (i < teeth) {
-            glVertex3f(r1 * (float)cos(angle + 3 * da), r1 * (float)sin(angle + 3 * da), -width * 0.5f);
-            glVertex3f(r0 * (float)cos(angle), r0 * (float)sin(angle), -width * 0.5f);
-        }
-    }
-    glEnd();
-
-    /* draw back sides of teeth */
-    glBegin(GL_QUADS);
-    da = 2.f * (float)M_PI / teeth / 4.f;
-    for (i = 0; i < teeth; i++) {
-        angle = i * 2.f * (float)M_PI / teeth;
-
-        glVertex3f(r1 * (float)cos(angle + 3 * da), r1 * (float)sin(angle + 3 * da), -width * 0.5f);
-        glVertex3f(r2 * (float)cos(angle + 2 * da), r2 * (float)sin(angle + 2 * da), -width * 0.5f);
-        glVertex3f(r2 * (float)cos(angle + da), r2 * (float)sin(angle + da), -width * 0.5f);
-        glVertex3f(r1 * (float)cos(angle), r1 * (float)sin(angle), -width * 0.5f);
-    }
-    glEnd();
-
-    /* draw outward faces of teeth */
-    glBegin(GL_QUAD_STRIP);
-    for (i = 0; i < teeth; i++) {
-        angle = i * 2.f * (float)M_PI / teeth;
-
-        glVertex3f(r1 * (float)cos(angle), r1 * (float)sin(angle), width * 0.5f);
-        glVertex3f(r1 * (float)cos(angle), r1 * (float)sin(angle), -width * 0.5f);
-        u = r2 * (float)cos(angle + da) - r1 * (float)cos(angle);
-        v = r2 * (float)sin(angle + da) - r1 * (float)sin(angle);
-        len = (float)sqrt(u * u + v * v);
-        u /= len;
-        v /= len;
-        glNormal3f(v, -u, 0.0);
-        glVertex3f(r2 * (float)cos(angle + da), r2 * (float)sin(angle + da), width * 0.5f);
-        glVertex3f(r2 * (float)cos(angle + da), r2 * (float)sin(angle + da), -width * 0.5f);
-        glNormal3f((float)cos(angle), (float)sin(angle), 0.f);
-        glVertex3f(r2 * (float)cos(angle + 2 * da), r2 * (float)sin(angle + 2 * da), width * 0.5f);
-        glVertex3f(r2 * (float)cos(angle + 2 * da), r2 * (float)sin(angle + 2 * da), -width * 0.5f);
-        u = r1 * (float)cos(angle + 3 * da) - r2 * (float)cos(angle + 2 * da);
-        v = r1 * (float)sin(angle + 3 * da) - r2 * (float)sin(angle + 2 * da);
-        glNormal3f(v, -u, 0.f);
-        glVertex3f(r1 * (float)cos(angle + 3 * da), r1 * (float)sin(angle + 3 * da), width * 0.5f);
-        glVertex3f(r1 * (float)cos(angle + 3 * da), r1 * (float)sin(angle + 3 * da), -width * 0.5f);
-        glNormal3f((float)cos(angle), (float)sin(angle), 0.f);
-    }
-
-    glVertex3f(r1 * (float)cos(0), r1 * (float)sin(0), width * 0.5f);
-    glVertex3f(r1 * (float)cos(0), r1 * (float)sin(0), -width * 0.5f);
-
-    glEnd();
-
-    glShadeModel(GL_SMOOTH);
-
-    /* draw inside radius cylinder */
-    glBegin(GL_QUAD_STRIP);
-    for (i = 0; i <= teeth; i++) {
-        angle = i * 2.f * (float)M_PI / teeth;
-        glNormal3f(-(float)cos(angle), -(float)sin(angle), 0.f);
-        glVertex3f(r0 * (float)cos(angle), r0 * (float)sin(angle), -width * 0.5f);
-        glVertex3f(r0 * (float)cos(angle), r0 * (float)sin(angle), width * 0.5f);
-    }
-    glEnd();
-
+static void error_callback(int error, const char* description)
+{
+    fprintf(stderr, "Error: %s\n", description);
 }
 
-
-static GLfloat view_rotx = 20.f, view_roty = 30.f, view_rotz = 0.f;
-static GLint gear1, gear2, gear3;
-static GLfloat angle = 0.f;
-
-/* OpenGL draw function & timing */
-static void draw(void)
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    glClearColor(0.0, 0.0, 0.0, 0.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glPushMatrix();
-    glRotatef(view_rotx, 1.0, 0.0, 0.0);
-    glRotatef(view_roty, 0.0, 1.0, 0.0);
-    glRotatef(view_rotz, 0.0, 0.0, 1.0);
-
-    glPushMatrix();
-    glTranslatef(-3.0, -2.0, 0.0);
-    glRotatef(angle, 0.0, 0.0, 1.0);
-    glCallList(gear1);
-    glPopMatrix();
-
-    glPushMatrix();
-    glTranslatef(3.1f, -2.f, 0.f);
-    glRotatef(-2.f * angle - 9.f, 0.f, 0.f, 1.f);
-    glCallList(gear2);
-    glPopMatrix();
-
-    glPushMatrix();
-    glTranslatef(-3.1f, 4.2f, 0.f);
-    glRotatef(-2.f * angle - 25.f, 0.f, 0.f, 1.f);
-    glCallList(gear3);
-    glPopMatrix();
-
-    glPopMatrix();
-}
-
-
-/* update animation parameters */
-static void animate(void)
-{
-    angle = 100.f * (float)glfwGetTime();
-}
-
-
-/* change view angle, exit upon ESC */
-void key(GLFWwindow* window, int k, int s, int action, int mods)
-{
-    if (action != GLFW_PRESS) return;
-
-    switch (k) {
-    case GLFW_KEY_Z:
-        if (mods & GLFW_MOD_SHIFT)
-            view_rotz -= 5.0;
-        else
-            view_rotz += 5.0;
-        break;
-    case GLFW_KEY_ESCAPE:
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
-        break;
-    case GLFW_KEY_UP:
-        view_rotx += 5.0;
-        break;
-    case GLFW_KEY_DOWN:
-        view_rotx -= 5.0;
-        break;
-    case GLFW_KEY_LEFT:
-        view_roty += 5.0;
-        break;
-    case GLFW_KEY_RIGHT:
-        view_roty -= 5.0;
-        break;
-    default:
-        return;
-    }
 }
 
-
-/* new window size */
-void reshape(GLFWwindow* window, int width, int height)
+int main(void)
 {
-    GLfloat h = (GLfloat)height / (GLfloat)width;
-    GLfloat xmax, znear, zfar;
-
-    znear = 5.0f;
-    zfar = 30.0f;
-    xmax = znear * 0.5f;
-
-    glViewport(0, 0, (GLint)width, (GLint)height);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glFrustum(-xmax, xmax, -xmax * h, xmax * h, znear, zfar);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glTranslatef(0.0, 0.0, -20.0);
-}
-
-
-/* program & OpenGL initialization */
-static void init(void)
-{
-    static GLfloat pos[4] = { 5.f, 5.f, 10.f, 0.f };
-    static GLfloat red[4] = { 0.8f, 0.1f, 0.f, 1.f };
-    static GLfloat green[4] = { 0.f, 0.8f, 0.2f, 1.f };
-    static GLfloat blue[4] = { 0.2f, 0.2f, 1.f, 1.f };
-
-    glLightfv(GL_LIGHT0, GL_POSITION, pos);
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-    glEnable(GL_DEPTH_TEST);
-
-    /* make the gears */
-    gear1 = glGenLists(1);
-    glNewList(gear1, GL_COMPILE);
-    glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, red);
-    gear(1.f, 4.f, 1.f, 20, 0.7f);
-    glEndList();
-
-    gear2 = glGenLists(1);
-    glNewList(gear2, GL_COMPILE);
-    glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, green);
-    gear(0.5f, 2.f, 2.f, 10, 0.7f);
-    glEndList();
-
-    gear3 = glGenLists(1);
-    glNewList(gear3, GL_COMPILE);
-    glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, blue);
-    gear(1.3f, 2.f, 0.5f, 10, 0.7f);
-    glEndList();
-
-    glEnable(GL_NORMALIZE);
-}
-
-
-/* program entry */
-int main(int argc, char* argv[])
-{
-    GLFWwindow* window;
-    int width, height;
+    glfwSetErrorCallback(error_callback);
 
     if (!glfwInit())
-    {
-        fprintf(stderr, "Failed to initialize GLFW\n");
         exit(EXIT_FAILURE);
-    }
 
-    glfwWindowHint(GLFW_DEPTH_BITS, 16);
-    glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, 1);
 
-    window = glfwCreateWindow(300, 300, "Gears", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(640, 480, "OpenGL Triangle", NULL, NULL);
     if (!window)
     {
-        fprintf(stderr, "Failed to open GLFW window\n");
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
 
-    // Set callback functions
-    glfwSetFramebufferSizeCallback(window, reshape);
-    glfwSetKeyCallback(window, key);
+    glfwSetKeyCallback(window, key_callback);
 
     glfwMakeContextCurrent(window);
     gladLoadGL(glfwGetProcAddress);
     glfwSwapInterval(1);
 
-    glfwGetFramebufferSize(window, &width, &height);
-    reshape(window, width, height);
+    // NOTE: OpenGL error checks have been omitted for brevity
 
-    // Parse command-line options
-    init();
+    GLuint vertex_buffer;
+    glGenBuffers(1, &vertex_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Main loop
+    const GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
+    glCompileShader(vertex_shader);
+
+    const GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
+    glCompileShader(fragment_shader);
+
+    const GLuint program = glCreateProgram();
+    glAttachShader(program, vertex_shader);
+    glAttachShader(program, fragment_shader);
+    glLinkProgram(program);
+
+    const GLint mvp_location = glGetUniformLocation(program, "MVP");
+    const GLint vpos_location = glGetAttribLocation(program, "vPos");
+    const GLint vcol_location = glGetAttribLocation(program, "vCol");
+
+    GLuint vertex_array;
+    glGenVertexArrays(1, &vertex_array);
+    glBindVertexArray(vertex_array);
+    glEnableVertexAttribArray(vpos_location);
+    glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(Vertex), (void*) offsetof(Vertex, pos));
+    glEnableVertexAttribArray(vcol_location);
+    glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(Vertex), (void*) offsetof(Vertex, col));
+
     while (!glfwWindowShouldClose(window))
     {
-        // Draw gears
-        draw();
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        const float ratio = width / (float) height;
 
-        // Update animation
-        animate();
+        glViewport(0, 0, width, height);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-        // Swap buffers
+        mat4x4 m, p, mvp;
+        mat4x4_identity(m);
+        mat4x4_rotate_Z(m, m, (float) glfwGetTime());
+        mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+        mat4x4_mul(mvp, p, m);
+
+        glUseProgram(program);
+        glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) &mvp);
+        glBindVertexArray(vertex_array);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // Terminate GLFW
-    glfwTerminate();
+    glfwDestroyWindow(window);
 
-    // Exit program
+    glfwTerminate();
     exit(EXIT_SUCCESS);
 }
 
+//! [code]

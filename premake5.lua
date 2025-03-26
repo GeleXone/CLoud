@@ -31,6 +31,7 @@ project "CLoud"
 
     includedirs {
 		"%{prj.name}/src",
+		"%{prj.name}/include",
 		"%{IncludeDir.glfw}",
 		"%{IncludeDir.glad}"
 	}
@@ -84,10 +85,12 @@ group "depend"
                 "%{prj.location}/src/posix_time.c",
                 "%{prj.location}/src/posix_thread.c",
                 "%{prj.location}/src/posix_module.c",
+                "%{prj.location}/src/posix_poll.c",
                 "%{prj.location}/src/glx_context.c",
                 "%{prj.location}/src/egl_context.c",
                 "%{prj.location}/src/osmesa_context.c",
                 "%{prj.location}/src/linux_joystick.c"
+
             }
 
             defines {

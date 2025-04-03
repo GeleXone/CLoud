@@ -5,7 +5,7 @@ My game in C++
 
 Prerequisites 
     for Debian:
-        sudo apt install libwayland-dev libxkbcommon-dev xorg-dev wget zip make gcc uuid-dev
+        sudo apt install libwayland-dev libxkbcommon-dev xorg-dev xorg wget zip make gcc uuid-dev
         wget https://github.com/premake/premake-core/releases/download/v5.0.0-beta5/premake-5.0.0-beta5-src.zip
         unzip premake-5.0.0-beta5-src.zip
         cd premake-5.0.0-beta5-src

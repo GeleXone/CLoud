@@ -1,3 +1,0 @@
-[submodule "CLoud/depend/glfw"]
-	path = CLoud/depend/glfw
-	url = https://github.com/glfw/glfw

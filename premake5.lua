@@ -12,13 +12,13 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 -- Include directories relative to root folder (solution directory)
 IncludeDir = {}
 IncludeDir["glfw"] = "CLoud/depend/glfw/include"
-IncludeDir["glfw_deps"] = "CLoud/depend/glfw/deps"
 IncludeDir["glad"] = "CLoud/depend/glad/include"
+IncludeDir["Xone"] = "CLoud/depend/Xone/include"
 
 project "CLoud"
 	location "CLoud"
 	kind "ConsoleApp"
-	language "C++"
+	language "C"
 	
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
@@ -33,12 +33,14 @@ project "CLoud"
 		"%{prj.name}/src",
 		"%{prj.name}/include",
 		"%{IncludeDir.glfw}",
-		"%{IncludeDir.glad}"
+		"%{IncludeDir.glad}",
+		"%{IncludeDir.Xone}"
 	}
 
     links {
         "glfw",
-        "glad"
+        "glad",
+        "Xone"
     }
 
 group "depend"
@@ -188,5 +190,23 @@ group "depend"
         filter "configurations:Release"
             runtime "Release"
             optimize "speed"
+    
+    project "Xone"
+        location "CLoud/depend/Xone"
+        kind "StaticLib"
+        language "C"
+        
+        targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+        objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
+    
+        files {
+            "%{prj.location}/src/**.h",
+            "%{prj.location}/src/**.c",
+            "%{prj.location}/src/**.cpp",
+        }
+    
+        includedirs {
+            "%{prj.location}/include"
+        }
             
 group ""

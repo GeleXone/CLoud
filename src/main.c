@@ -6,13 +6,13 @@
 #include <stdio.h>
 #include <malloc.h>
 
-#include <gx/matrix.h>
+#include <Xone/matrix.h>
 
 char* vertexShader = "#version 460 core\n"
 "layout(location=0) in vec3 vertexPosition;\n"
+"uniform mat4 u_MVP;\n"
 "void main() {\n"
-"    gl_Position.xyz = vertexPosition;\n"
-"    gl_Position.w = 1.0;\n"
+"    gl_Position = u_MVP * vec4(vertexPosition,1);\n"
 "}";
 
 char* fragmentShader = "#version 460 core\n"
@@ -44,7 +44,8 @@ int main(void)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, 0);
 
-    GLFWwindow* window = glfwCreateWindow(640, 480, "OpenGL Triangle", NULL, NULL);
+    const int width = 640, height = 480;
+    GLFWwindow* window = glfwCreateWindow(width, height, "OpenGL Triangle", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -98,6 +99,22 @@ int main(void)
     glDeleteShader(vertexShaderID);
     glDeleteShader(fragmentShaderID);
 
+    matrix_t* Projection = matrix_create(4, 4);
+    matrix_set_perspective(Projection, 45, width / height, 0.1, 100);
+    matrix_t* View = matrix_create(4, 4);
+    vec_t* eye = vec_create(3);
+    vec3_set(eye, 4, 3, 3);
+    vec_t* center = vec_create(3);
+    vec3_set(center, 0, 0, 0);
+    vec_t* up = vec_create(3);
+    vec3_set(up, 0, 1, 0);
+    look_at(View, eye, center, up);
+    matrix_t* Model = matrix_create(4, 4);
+    matrix_set_identity(Model);
+    matrix_t* MVP = matrix_create(4, 4);
+
+    mat4 test_mat[16];
+
     glClearColor(0, 0, 0.4, 0);
     while (!glfwWindowShouldClose(window))
     {
@@ -107,6 +124,13 @@ int main(void)
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
+        matrix_mult_matrix(MVP, View, Model);
+        matrix_mult_matrix(MVP, Projection, MVP);
+        matrix_to_mat4(MVP, test_mat);
+
+        GLuint MatrixID = glGetUniformLocation(programID, "u_MVP");
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &test_mat[0][0]);
 
         glDrawArrays(GL_TRIANGLES, 0, 3);
 

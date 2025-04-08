@@ -1,0 +1,6 @@
+[submodule "depend/cglm"]
+	path = depend/cglm
+	url = https://github.com/recp/cglm
+[submodule "depend/glfw"]
+	path = depend/glfw
+	url = https://github.com/glfw/glfw

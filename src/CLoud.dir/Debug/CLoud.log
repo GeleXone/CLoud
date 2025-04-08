@@ -1,0 +1,4 @@
+﻿  Building Custom Rule C:/Users/gelexone/dev/CLoud/src/CMakeLists.txt
+  main.c
+C:\Users\gelexone\dev\CLoud\src\main.c(118,51): warning C4133: функция: несовместимые типы - из "double *" в "const GLfloat *"
+LINK : fatal error LNK1104: не удается открыть файл "..\depend\cglm\Debug\cglm.lib"
